@@ -61,15 +61,15 @@ struct ubx_gps_handle_s {
     struct {
         struct uavcan_equipment_gnss_Fix_s fix;
         struct uavcan_equipment_gnss_Auxiliary_s aux;
-    }state;
+    } state;
 } ubx_handle;
 
 struct ubx_msg_cfg_s {
     uint8_t class_id;
     uint8_t msg_id;
     uint8_t rate;
-    struct pubsub_topic_s topic;
-    struct worker_thread_listener_task_s listener_task;
+    struct pubsub_topic_s *topic;
+    struct worker_thread_listener_task_s *listener_task;
     pubsub_message_handler_func_ptr handler;
 };
 
@@ -109,20 +109,24 @@ struct worker_thread_listener_task_s ubx_cfg_msg_listener;
 static void ubx_cfg_msg_handler(size_t msg_size, const void* msg, void* ctx);
 
 //NAV-SVINFO
+struct pubsub_topic_s ubx_nav_svinfo_topic;
+struct worker_thread_listener_task_s ubx_nav_svinfo_listener;
 static void ubx_nav_svinfo_handler(size_t msg_size, const void* msg, void* ctx);
 //NAV-POSLLH
 //static void ubx_nav_posllh_handler(size_t msg_size, const void* msg, void* ctx);
 //NAV-VELNED
 //static void ubx_nav_velned_handler(size_t msg_size, const void* msg, void* ctx);
 //NAV-PVT
+struct pubsub_topic_s ubx_nav_pvt_topic;
+struct worker_thread_listener_task_s ubx_nav_pvt_listener;
 static void ubx_nav_pvt_handler(size_t msg_size, const void* msg, void* ctx);
 //NAV-STATUS
 //static void ubx_nav_status_handler(size_t msg_size, const void* msg, void* ctx);
 
 
-struct ubx_msg_cfg_s ubx_cfg_list[] = { \
-    {UBX_NAV_SVINFO_CLASS_ID, UBX_NAV_SVINFO_MSG_ID, 4, {0}, {0}, ubx_nav_svinfo_handler}, \
-    {UBX_NAV_PVT_CLASS_ID, UBX_NAV_PVT_MSG_ID, 1, {0}, {0}, ubx_nav_pvt_handler}, \
+struct ubx_msg_cfg_s ubx_cfg_list[] = {
+    {UBX_NAV_SVINFO_CLASS_ID, UBX_NAV_SVINFO_MSG_ID, 4, &ubx_nav_svinfo_topic, &ubx_nav_svinfo_listener, ubx_nav_svinfo_handler},
+    {UBX_NAV_PVT_CLASS_ID, UBX_NAV_PVT_MSG_ID, 1, &ubx_nav_pvt_topic, &ubx_nav_pvt_listener, ubx_nav_pvt_handler},
 };
 
 
@@ -180,9 +184,9 @@ static void ubx_init(struct ubx_gps_handle_s *ubx_handle, SerialDriver* serial, 
 
     //Register Messages in the cfg list
     for (uint8_t i = 0; i < ubx_handle->total_msg_cfgs; i++) {
-        pubsub_init_topic(&ubx_cfg_list[i].topic, &UBX_MSG_TOPIC_GROUP);
-        if (gps_ubx_init_msg_topic(&gps_handle, ubx_cfg_list[i].class_id, ubx_cfg_list[i].msg_id, parsed_msg_buffer, sizeof(parsed_msg_buffer), &ubx_cfg_list[i].topic)) {
-            worker_thread_add_listener_task(&WT, &ubx_cfg_list[i].listener_task, &ubx_cfg_list[i].topic, ubx_cfg_list[i].handler, ubx_handle);
+        pubsub_init_topic(ubx_cfg_list[i].topic, &UBX_MSG_TOPIC_GROUP);
+        if (gps_ubx_init_msg_topic(&gps_handle, ubx_cfg_list[i].class_id, ubx_cfg_list[i].msg_id, parsed_msg_buffer, sizeof(parsed_msg_buffer), ubx_cfg_list[i].topic)) {
+            worker_thread_add_listener_task(&WT, ubx_cfg_list[i].listener_task, ubx_cfg_list[i].topic, ubx_cfg_list[i].handler, ubx_handle);
             uavcan_send_debug_msg(LOG_LEVEL_INFO, "GPS", "Registered Topic for 0x%x 0x%x", ubx_cfg_list[i].class_id, ubx_cfg_list[i].msg_id);
         }
     }
@@ -353,7 +357,7 @@ static void ubx_nav_pvt_handler(size_t msg_size, const void* msg, void* ctx)
             //_handle->state.fix.heading_of_motion =
             //uncertainties
             //Position
-            uavcan_send_debug_msg(LOG_LEVEL_DEBUG, "NAV-PVT" ,"%d %d", nav_pvt->hAcc, nav_pvt->vAcc);
+            //uavcan_send_debug_msg(LOG_LEVEL_DEBUG, "NAV-PVT" ,"%d %d", nav_pvt->hAcc, nav_pvt->vAcc);
             _handle->state.fix.position_covariance_len = 9;
             _handle->state.fix.position_covariance[0] = SQ(((float)(nav_pvt->hAcc)/1e3f));
             _handle->state.fix.position_covariance[4] = SQ(((float)(nav_pvt->hAcc)/1e3f));
@@ -432,7 +436,7 @@ static void ubx_cfg_msg_handler(size_t msg_size, const void* msg, void* ctx)
     struct ubx_cfg_msg_getset_s *cfg_msg = ubx_parse_ubx_cfg_msg_getset(parsed_msg->frame_buffer, parsed_msg->msg_len);
     if (cfg_msg != NULL) {
         if (_handle->cfg_step == STEP_CFG_MSG && _handle->cfg_msg_index < _handle->total_msg_cfgs) {
-            if (cfg_msg->msgClass == ubx_cfg_list[_handle->cfg_msg_index].class_id && 
+            if (cfg_msg->msgClass == ubx_cfg_list[_handle->cfg_msg_index].class_id &&
                 cfg_msg->msgID == ubx_cfg_list[_handle->cfg_msg_index].msg_id &&
                 cfg_msg->rate[UBX_PORT_ID] == ubx_cfg_list[_handle->cfg_msg_index].rate) {
                 gps_debug("CFG-MSG", "MSG CFG (%d/%d) for 0x%x 0x%x set", _handle->cfg_msg_index + 1, _handle->total_msg_cfgs, ubx_cfg_list[_handle->cfg_msg_index].class_id, ubx_cfg_list[_handle->cfg_msg_index].msg_id, _handle->total_msg_cfgs);

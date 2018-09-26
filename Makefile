@@ -24,13 +24,17 @@ uavcan_beginfirmwareupdate_server \
 uavcan_allocatee \
 uavcan_restart \
 freemem_check \
-gps
+gps \
+spi_device \
+driver_ak09916 \
+driver_icm20x48
 
 MESSAGES_ENABLED = \
 uavcan.protocol.debug.LogMessage \
 uavcan.protocol.debug.KeyValue \
 uavcan.equipment.gnss.Fix \
-uavcan.equipment.gnss.Auxiliary
+uavcan.equipment.gnss.Auxiliary \
+uavcan.equipment.ahrs.MagneticFieldStrength
 
 UBX_MESSAGES_ENABLED = \
 ACK-ACK \
