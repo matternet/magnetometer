@@ -11,7 +11,9 @@
 #include <modules/worker_thread/worker_thread.h>
 #include <modules/uavcan_debug/uavcan_debug.h>
 #include <uavcan.equipment.gnss.Fix.h>
+#include <uavcan.equipment.gnss.Fix2.h>
 #include <uavcan.equipment.gnss.Auxiliary.h>
+#include <uavcan.equipment.gnss.RTCMStream.h>
 #include <ubx_msgs.h>
 #include <time.h>
 
@@ -57,9 +59,11 @@ struct ubx_gps_handle_s {
     bool do_cfg;
     uint32_t last_baud_change_ms;
     struct worker_thread_timer_task_s ubx_gps_init_task;
+    struct worker_thread_listener_task_s gps_inject_listener_task;
     uint8_t total_msg_cfgs;
     struct {
         struct uavcan_equipment_gnss_Fix_s fix;
+        struct uavcan_equipment_gnss_Fix2_s fix2;
         struct uavcan_equipment_gnss_Auxiliary_s aux;
     } state;
 } ubx_handle;
@@ -123,6 +127,7 @@ static void ubx_nav_pvt_handler(size_t msg_size, const void* msg, void* ctx);
 //NAV-STATUS
 //static void ubx_nav_status_handler(size_t msg_size, const void* msg, void* ctx);
 
+static void gps_inject_handler(size_t msg_size, const void* buf, void* ctx);
 
 struct ubx_msg_cfg_s ubx_cfg_list[] = {
     {UBX_NAV_SVINFO_CLASS_ID, UBX_NAV_SVINFO_MSG_ID, 4, &ubx_nav_svinfo_topic, &ubx_nav_svinfo_listener, ubx_nav_svinfo_handler},
@@ -190,6 +195,10 @@ static void ubx_init(struct ubx_gps_handle_s *ubx_handle, SerialDriver* serial, 
             uavcan_send_debug_msg(LOG_LEVEL_INFO, "GPS", "Registered Topic for 0x%x 0x%x", ubx_cfg_list[i].class_id, ubx_cfg_list[i].msg_id);
         }
     }
+
+    //Register Listener to GPS Inject Message
+    struct pubsub_topic_s* gps_inject_topic = uavcan_get_message_topic(0, &uavcan_equipment_gnss_RTCMStream_descriptor);
+    worker_thread_add_listener_task(&WT, &ubx_handle->gps_inject_listener_task, gps_inject_topic, gps_inject_handler, &ubx_handle);
 }
 
 static void send_init_blob(SerialDriver* serial)
@@ -474,3 +483,14 @@ static void ubx_cfg_rate_handler(size_t msg_size, const void* msg, void* ctx)
         gps_debug("CFG-RATE", "BAD MSG");
     }
 }
+
+static void gps_inject_handler(size_t msg_size, const void* buf, void* ctx)
+{
+    (void)msg_size;
+    struct ubx_gps_handle_s *ubx_instance = (struct ubx_gps_handle_s*)ctx;
+    const struct uavcan_deserialized_message_s* msg_wrapper = buf;
+    const struct uavcan_equipment_gnss_RTCMStream_s* msg = (const struct uavcan_equipment_gnss_RTCMStream_s*)msg_wrapper->msg;
+
+    sdWrite(ubx_instance->serial, (const uint8_t*)msg->data, msg->data_len);
+}
+
