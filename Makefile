@@ -1,6 +1,6 @@
 CSRC = $(shell find src -name "*.c")
 INCDIR = ./include
-USE_OPT = -O1 -g
+USE_OPT = -Os -g
 USE_LTO = no
 USE_PROCESS_STACKSIZE = 0x400
 USE_EXCEPTIONS_STACKSIZE = 0x300
@@ -27,14 +27,25 @@ freemem_check \
 gps \
 spi_device \
 driver_ak09916 \
-driver_icm20x48
+driver_icm20x48 \
+uavcan_param_interface \
+param \
+flash
 
 MESSAGES_ENABLED = \
 uavcan.protocol.debug.LogMessage \
 uavcan.protocol.debug.KeyValue \
 uavcan.equipment.gnss.Fix \
+uavcan.equipment.gnss.Fix2 \
 uavcan.equipment.gnss.Auxiliary \
-uavcan.equipment.ahrs.MagneticFieldStrength
+uavcan.equipment.ahrs.MagneticFieldStrength \
+uavcan.equipment.gnss.RTCMStream \
+uavcan.equipment.gnss.ECEFPositionVelocity \
+uavcan.protocol.param.GetSet
+# uavcan.equipment.indication.LightsCommand
+# uavcan.equipment.indication.SingleLightCommand
+# uavcan.equipment.indication.RGB565
+
 
 UBX_MESSAGES_ENABLED = \
 ACK-ACK \
