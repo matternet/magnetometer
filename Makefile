@@ -1,7 +1,7 @@
 CSRC = $(shell find src -name "*.c")
 INCDIR = ./include
-USE_OPT = -Os -g
-USE_LTO = no
+USE_OPT = -Os
+USE_LTO = yes
 USE_PROCESS_STACKSIZE = 0x400
 USE_EXCEPTIONS_STACKSIZE = 0x300
 MODULES_ENABLED = \
@@ -30,7 +30,9 @@ driver_ak09916 \
 driver_icm20x48 \
 uavcan_param_interface \
 param \
-flash
+flash \
+driver_profiled \
+driver_ms5611
 
 MESSAGES_ENABLED = \
 uavcan.protocol.debug.LogMessage \
@@ -41,10 +43,12 @@ uavcan.equipment.gnss.Auxiliary \
 uavcan.equipment.ahrs.MagneticFieldStrength \
 uavcan.equipment.gnss.RTCMStream \
 uavcan.equipment.gnss.ECEFPositionVelocity \
-uavcan.protocol.param.GetSet
-# uavcan.equipment.indication.LightsCommand
-# uavcan.equipment.indication.SingleLightCommand
-# uavcan.equipment.indication.RGB565
+uavcan.protocol.param.GetSet \
+uavcan.equipment.indication.LightsCommand \
+uavcan.equipment.indication.SingleLightCommand \
+uavcan.equipment.indication.RGB565 \
+uavcan.equipment.air_data.StaticPressure \
+uavcan.equipment.air_data.StaticTemperature
 
 
 UBX_MESSAGES_ENABLED = \
