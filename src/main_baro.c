@@ -25,19 +25,22 @@ RUN_AFTER(INIT_END) {
         }
         usleep(10000);
     }
-    worker_thread_add_timer_task(&WT, &ms5611_task, ms5611_task_func, NULL, MS2ST(10), true);
+    worker_thread_add_timer_task(&WT, &ms5611_task, ms5611_task_func, NULL, MS2ST(25), true);
 }
 
 static void ms5611_task_func(struct worker_thread_timer_task_s* task) {
     (void)task;
     static uint8_t _state = 0;
     static uint8_t accum_count;
-    if (!ms5611_initialised) {
+    static uint8_t _retry_count = 0;
+    _retry_count++;
+    if (!ms5611_initialised && _retry_count > 50) {
         if (ms5611_init(&ms5611, 3, BOARD_PAL_LINE_SPI3_MS5611_CS)) {
             ms5611_initialised = true;
             ms5611_measure_temperature(&ms5611);
         }
-    } else {
+        _retry_count = 0;
+    } else if (ms5611_initialised) {
         if (_state == 0) {
             ms5611_accum_temperature(&ms5611);
             ms5611_measure_pressure(&ms5611);
