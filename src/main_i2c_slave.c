@@ -1,46 +1,24 @@
 #include <hal.h>
-#include <main_i2c_slave.h>
 #include <modules/driver_ak09916/driver_ak09916.h>
+#include <common/ctor.h>
 
-#define TOSHIBALED_I2C_ADDRESS 0x55
+/**
+ * TIMINGR register definitions
+ */
+#define STM32_TIMINGR_PRESC_MASK        (15U << 28)
+#define STM32_TIMINGR_PRESC(n)          ((n) << 28)
+#define STM32_TIMINGR_SCLDEL_MASK       (15U << 20)
+#define STM32_TIMINGR_SCLDEL(n)         ((n) << 20)
+#define STM32_TIMINGR_SDADEL_MASK       (15U << 16)
+#define STM32_TIMINGR_SDADEL(n)         ((n) << 16)
+#define STM32_TIMINGR_SCLH_MASK         (255U << 8)
+#define STM32_TIMINGR_SCLH(n)           ((n) << 8)
+#define STM32_TIMINGR_SCLL_MASK         (255U << 0)
+#define STM32_TIMINGR_SCLL(n)           ((n) << 0)
+
 #define AK09916_I2C_ADDR 0x0C
 
-static uint32_t led_color_hex;
-static uint8_t led_reg;
-static bool new_led_data = false;
-
-static void toshibaled_interface_recv_byte(uint8_t recv_byte_idx, uint8_t recv_byte) {
-    if (recv_byte_idx == 0 || ((recv_byte&(1<<7)) != 0)) {
-        led_reg = recv_byte & ~(1<<7);
-    } else {
-        switch(led_reg) {
-            case 1:
-                led_color_hex &= ~((uint32_t)0xff<<0);
-                led_color_hex |= (uint32_t)(((recv_byte << 4)&0xf0) | (recv_byte&0x0f))<<0;
-                break;
-            case 2:
-                led_color_hex &= ~((uint32_t)0xff<<8);
-                led_color_hex |= (uint32_t)(((recv_byte << 4)&0xf0) | (recv_byte&0x0f))<<8;
-                break;
-            case 3:
-                led_color_hex &= ~((uint32_t)0xff<<16);
-                led_color_hex |= (uint32_t)(((recv_byte << 4)&0xf0) | (recv_byte&0x0f))<<16;
-                break;
-        }
-        led_reg++;
-        new_led_data = true;
-    }
-}
-
-bool i2c_slave_led_updated(void) {
-    return new_led_data;
-}
-uint32_t i2c_slave_retrieve_led_color_hex(void) {
-    new_led_data = false;
-    return led_color_hex;
-}
-
-void i2c_serve_interrupt(uint32_t isr) {
+static void i2c_serve_interrupt(uint32_t isr) {
     static uint8_t i2c2_transfer_byte_idx;
     static uint8_t i2c2_transfer_address;
     static uint8_t i2c2_transfer_direction;
@@ -57,9 +35,6 @@ void i2c_serve_interrupt(uint32_t isr) {
     if (isr & I2C_ISR_RXNE) {
         uint8_t recv_byte = I2C2->RXDR & 0xff;; // reading clears our interrupt flag
         switch(i2c2_transfer_address) {
-            case TOSHIBALED_I2C_ADDRESS:
-                toshibaled_interface_recv_byte(i2c2_transfer_byte_idx, recv_byte);
-                break;
             case AK09916_I2C_ADDR:
                 ak09916_recv_byte(i2c2_transfer_byte_idx, recv_byte);
                 break;
@@ -88,4 +63,47 @@ OSAL_IRQ_HANDLER(STM32_I2C2_EVENT_HANDLER) {
     i2c_serve_interrupt(isr);
 
     OSAL_IRQ_EPILOGUE();
+}
+
+RUN_AFTER(INIT_END) {
+    rccEnableI2C2(FALSE);
+    rccResetI2C2();
+
+    //Disable I2C
+    I2C2->CR1 &= ~I2C_CR1_PE;
+
+    //Enable Analog Filter
+    I2C2->CR1 &= ~I2C_CR1_ANFOFF;
+
+    //Disable Digital Filter
+    I2C2->CR1 &=  ~(I2C_CR1_DNF);
+
+    //Set Prescaler
+    I2C2->TIMINGR = (I2C2->TIMINGR & ~STM32_TIMINGR_PRESC_MASK) |
+                (STM32_TIMINGR_PRESC(8));
+
+    //Set Data Setup Time
+    I2C2->TIMINGR = (I2C2->TIMINGR & ~STM32_TIMINGR_SCLDEL_MASK) |
+                (STM32_TIMINGR_SCLDEL(9));
+
+    //Set Data Hold Time
+    I2C2->TIMINGR = (I2C2->TIMINGR & ~STM32_TIMINGR_SDADEL_MASK) |
+                (STM32_TIMINGR_SDADEL(11));
+
+    //Enable Stretching
+    I2C2->CR1 &= ~I2C_CR1_NOSTRETCH;
+
+    //7Bit Address Mode
+    I2C2->CR2 &= ~I2C_CR2_ADD10;
+
+    I2C2->OAR1 = (AK09916_I2C_ADDR & 0xFF) << 1; //Emulate Toshiba LED I2C Slave
+    I2C2->OAR1 |= (1<<15);
+
+    //Enable I2C interrupt
+    nvicEnableVector(I2C2_EV_IRQn, 3);
+
+    I2C2->CR1 |= (1<<1); // TXIE
+    I2C2->CR1 |= (1<<2); // RXIE
+    I2C2->CR1 |= (1<<3); // ADDRIE
+    I2C2->CR1 |= I2C_CR1_PE; // Enable I2C
 }

@@ -24,12 +24,9 @@ uavcan_beginfirmwareupdate_server \
 uavcan_allocatee \
 uavcan_restart \
 freemem_check \
-gps \
 spi_device \
 driver_ak09916 \
-driver_icm20x48 \
-driver_profiled \
-driver_ms5611
+driver_icm20x48
 
 MESSAGES_ENABLED = \
 uavcan.protocol.debug.LogMessage \
