@@ -11,9 +11,10 @@ void boardInit(void) {
     palSetLineMode(BOARD_PAL_LINE_I2C_SLAVE_SDA, PAL_MODE_ALTERNATE(4));
 
     // Set NC pins to pulldown
-    for (uint8_t i=0; i<8; i++) {
+    for (uint8_t i=0; i<=8; i++) {
         palSetLineMode(PAL_LINE(GPIOA,i), PAL_STM32_MODE_INPUT | PAL_STM32_PUPDR_PULLDOWN);
     }
+
     palSetLineMode(PAL_LINE(GPIOA,15), PAL_STM32_MODE_INPUT | PAL_STM32_PUPDR_PULLDOWN);
 
     palSetLineMode(PAL_LINE(GPIOB,0), PAL_STM32_MODE_INPUT | PAL_STM32_PUPDR_PULLDOWN);
