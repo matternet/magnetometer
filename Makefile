@@ -23,6 +23,9 @@ uavcan_getnodeinfo_server \
 uavcan_beginfirmwareupdate_server \
 uavcan_allocatee \
 uavcan_restart \
+flash \
+param \
+uavcan_param_interface \
 freemem_check \
 spi_device \
 driver_ak09916 \
